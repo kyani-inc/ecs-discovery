@@ -3,7 +3,6 @@ package discover
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecs"
 )
@@ -12,7 +11,7 @@ func newECS(region string) *ecs.ECS {
 	session := session.New()
 	return ecs.New(session, &aws.Config{
 		Credentials: creds,
-		Region:      aws.String("region"),
+		Region:      aws.String(region),
 	})
 }
 
@@ -41,20 +40,22 @@ func (c *Client) ContainerInstances() ([]*string, error) {
 
 func (c *Client) containerInstances(NextToken *string) (*ecs.ListContainerInstancesOutput, error) {
 	params := &ecs.ListContainerInstancesInput{
-		Cluster:   c.Cluster,
+		Cluster:   aws.String(c.Cluster),
 		NextToken: NextToken,
 	}
 	resp, err := c.ecs.ListContainerInstances(params)
 	if err != nil {
 		return nil, err
 	}
+
+	return resp, err
 }
 
 // ContainerInstance takes a Container Instance ARN and returns the EC2
 // Instance ID attached to the ARN
 func (c *Client) ContainerInstance(ContainerInstanceARN *string) (*string, error) {
 	params := &ecs.DescribeContainerInstancesInput{
-		Cluster:            c.Cluster,
+		Cluster:            aws.String(c.Cluster),
 		ContainerInstances: []*string{ContainerInstanceARN},
 	}
 	resp, err := c.ecs.DescribeContainerInstances(params)
@@ -94,7 +95,7 @@ func (c *Client) TaskARNs() ([]*string, error) {
 
 func (c *Client) taskARNs(NextToken *string) (*ecs.ListTasksOutput, error) {
 	params := &ecs.ListTasksInput{
-		Cluster:   c.Cluster,
+		Cluster:   aws.String(c.Cluster),
 		NextToken: NextToken,
 	}
 	resp, err := c.ecs.ListTasks(params)
@@ -106,9 +107,9 @@ func (c *Client) taskARNs(NextToken *string) (*ecs.ListTasksOutput, error) {
 }
 
 // ECSTask takes a TaskARN and returns a Task
-func (c *Client) ECSTask(TaskARN *string) (*ecs.DescribeTasksOutput, error) {
+func (c *Client) ECSTask(TaskARN *string) (*ecs.Task, error) {
 	params := &ecs.DescribeTasksInput{
-		Cluster: cluster,
+		Cluster: aws.String(c.Cluster),
 		Tasks:   []*string{TaskARN},
 	}
 	resp, err := c.ecs.DescribeTasks(params)
@@ -120,7 +121,7 @@ func (c *Client) ECSTask(TaskARN *string) (*ecs.DescribeTasksOutput, error) {
 		return nil, fmt.Errorf("no tasks found for given task arn")
 	}
 
-	return resp.Tasks, nil
+	return resp.Tasks[0], nil
 }
 
 // TaskDefinition takes a TaskDefinitionARN and returns an associated Task Definition

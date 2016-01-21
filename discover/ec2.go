@@ -3,7 +3,6 @@ package discover
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
@@ -12,7 +11,7 @@ func newEC2(region string) *ec2.EC2 {
 	session := session.New()
 	return ec2.New(session, &aws.Config{
 		Credentials: creds,
-		Region:      aws.String("region"),
+		Region:      aws.String(region),
 	})
 }
 

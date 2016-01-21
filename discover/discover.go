@@ -7,13 +7,14 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ecs"
 )
 
 var (
-	creds = &credentials.EnvProvider{}
+	creds = credentials.NewChainCredentials([]credentials.Provider{
+		&credentials.EnvProvider{},
+	})
 )
 
 type Client struct {
@@ -25,13 +26,13 @@ type Client struct {
 	ec2 *ec2.EC2
 	ecs *ecs.ECS
 
-	tasks map[string]service
+	tasks map[string]Service
 	sync.RWMutex
 }
 
 type Service struct {
 	Endpoint string
-	Tasks    []task
+	Tasks    []Task
 }
 
 type Task struct {
@@ -39,14 +40,14 @@ type Task struct {
 	TaskARN       string
 	IPAddress     string
 	ContainerPort string
-	HostPort      string
+	HostPort      int
 }
 
-func NewClient(region, cluster string) *Client {
+func NewClient(cluster, region string) *Client {
 	return &Client{
 		Region:  region,
 		Cluster: cluster,
-		creds:   &credentials.EnvProvider{},
+		creds:   creds,
 
 		ec2: newEC2(region),
 		ecs: newECS(region),
@@ -97,7 +98,7 @@ func (c *Client) DiscoverECSTasks() error {
 	for _, task := range Tasks {
 		for _, container := range task.Containers {
 			var (
-				TaskName string
+				Taskname string
 				HostPort int64
 				Hostname string
 			)
@@ -123,30 +124,30 @@ func (c *Client) DiscoverECSTasks() error {
 					}
 
 					if host, ok := containerDefinition.DockerLabels["hostname"]; ok {
-						hostname = aws.StringValue(host)
+						Hostname = aws.StringValue(host)
 					}
 					break
 				}
 			}
 
-			if _, ok := c.tasks[TaskName]; !ok {
-				c.tasks[TaskName] = Service{Tasks: []Task{}}
+			if _, ok := c.tasks[Taskname]; !ok {
+				c.tasks[Taskname] = Service{Tasks: []Task{}}
 			}
 
-			tasks := c.tasks[TaskName].Tasks
+			tasks := c.tasks[Taskname].Tasks
 			tasks = append(tasks, Task{
 				Name:      aws.StringValue(container.Name),
-				ARN:       strings.Split(aws.StringValue(task.TaskArn), "/")[1],
+				TaskARN:   strings.Split(aws.StringValue(task.TaskArn), "/")[1],
 				IPAddress: containerInstances[aws.StringValue(task.ContainerInstanceArn)],
-				HostPort:  HostPort,
+				HostPort:  int(HostPort),
 			})
 
-			if hostname == "" {
-				hostname = aws.StringValue(container.Name)
+			if Hostname == "" {
+				Hostname = aws.StringValue(container.Name)
 			}
 
-			c.tasks[TaskName] = Service{
-				Endpoint: hostname,
+			c.tasks[Taskname] = Service{
+				Endpoint: Hostname,
 				Tasks:    tasks,
 			}
 		}
@@ -184,7 +185,7 @@ func (c *Client) ECSTasks(TaskARNs []*string) ([]*ecs.Task, error) {
 			return tasks, err
 		}
 
-		tasks = append(tasks, task.Tasks...)
+		tasks = append(tasks, task)
 	}
 
 	return tasks, nil
