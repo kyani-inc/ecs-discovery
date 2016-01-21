@@ -18,8 +18,9 @@ var (
 )
 
 type Client struct {
-	Region  string
-	Cluster string
+	Region        string
+	Cluster       string
+	DefaultDomain string
 
 	creds *credentials.Credentials
 
@@ -43,11 +44,13 @@ type Task struct {
 	HostPort      int
 }
 
-func NewClient(cluster, region string) *Client {
+func NewClient(cluster, region, defaultdomain string) *Client {
 	return &Client{
-		Region:  region,
-		Cluster: cluster,
-		creds:   creds,
+		Region:        region,
+		Cluster:       cluster,
+		DefaultDomain: defaultdomain,
+
+		creds: creds,
 
 		ec2: newEC2(region),
 		ecs: newECS(region),
@@ -143,7 +146,7 @@ func (c *Client) DiscoverECSTasks() error {
 			})
 
 			if Hostname == "" {
-				Hostname = aws.StringValue(container.Name)
+				Hostname = fmt.Sprintf("%s.%s", aws.StringValue(container.Name), c.DefaultDomain)
 			}
 
 			c.tasks[Taskname] = Service{
