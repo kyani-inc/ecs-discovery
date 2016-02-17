@@ -1,0 +1,76 @@
+defaults
+	mode	http
+	option 	httplog
+	option 	dontlognull
+	option 	http-server-close
+	option 	forwardfor
+	retries 3
+	option	redispatch
+	maxconn	4096
+
+	timeout	connect  5000
+	timeout client 120000
+	timeout server 120000
+
+frontend main
+	bind			*:8080
+	mode			http
+	capture request header X-Forwarded-For		len 50
+	capture request header X-Host 				len 50
+
+	# api-mobile-8080
+	acl api-mobile hdr_beg(host) -i api-mobile.discovery.mydomain.com
+	use_backend api-mobile_backend if api-mobile
+
+	# discoverer-8080
+	acl jntdyvdpvay hdr_beg(host) -i jntdyvdpvay.mydomain.com
+	use_backend jntdyvdpvay_backend if jntdyvdpvay
+
+	# identity-identity-object-8080
+	acl identity-identity-object hdr_beg(host) -i identity-identity-object.discovery.mydomain.com
+	use_backend identity-identity-object_backend if identity-identity-object
+
+	default_backend default
+
+# api-mobile-8080
+backend api-mobile_backend
+	balance roundrobin
+	rspadd X-Rule:\ api-mobile.discovery.mydomain.com
+ 	http-check expect ! rstatus ^5
+ 	default-server inter 2s fall 3 rise 2
+
+	server 0555f10f-4149-46c1-9e64-5b6b228de453 10.0.0.227:32787 check
+	server 2492f206-b45b-455c-904d-12260828c85c 10.0.0.227:32790 check
+	server 32be0b66-d8da-42b8-9bc3-a847cfd6ea0d 10.0.0.227:32786 check
+	server 4a4ccd4f-0ba2-47d1-8e19-bd6bc8dd136f 10.0.0.227:32795 check
+	server 5a41fe28-292a-44f9-bb40-0419dfe317ce 10.0.0.227:32794 check
+
+# discoverer-8080
+backend jntdyvdpvay_backend
+	balance roundrobin
+	rspadd X-Rule:\ jntdyvdpvay.mydomain.com
+ 	http-check expect ! rstatus ^5
+ 	default-server inter 2s fall 3 rise 2
+
+	server 94630879-f080-40ca-b30e-8c493a7a281b 10.0.4.103:32778 check
+	server f0bf4bae-c55b-488a-80ab-ad8dff9c335c 10.0.3.78:32772 check
+
+
+# identity-identity-object-8080
+backend identity-identity-object_backend
+	balance roundrobin
+	rspadd X-Rule:\ identity-identity-object.discovery.mydomain.com
+ 	http-check expect ! rstatus ^5
+ 	default-server inter 2s fall 3 rise 2
+
+	server 2b43a3c1-c877-49eb-bd59-a483fd654759 10.0.3.203:32779 check
+	server 36416533-d876-40b5-aa9f-b4386766ec62 10.0.4.103:32816 check
+	server 74f495a9-1f19-4088-89e4-1b9decf7a25c 10.0.2.165:32811 check
+	server 8e287d2b-f7db-4b7f-b777-16b19aa5894f 10.0.3.203:32780 check
+	server 928bf38e-060a-43e3-9b43-5ee0e9da6eed 10.0.3.86:32812 check
+
+backend default
+	balance roundrobin
+	rspadd  X-Rule:\ default
+
+	server google www.google.com:80 redir http://www.google.com

@@ -1,0 +1,41 @@
+defaults
+	mode	http
+	option 	httplog
+	option 	dontlognull
+	option 	http-server-close
+	option 	forwardfor
+	retries 3
+	option	redispatch
+	maxconn	4096
+	
+	timeout	connect  5000
+	timeout client 120000
+	timeout server 120000
+
+frontend main
+	bind			*:8080
+	mode			http
+	capture request header X-Forwarded-For		len 50
+	capture request header X-Host 				len 50
+
+	{{with tree "CONSUL_DIR_HERE" | explode}}{{range $key, $values := .}}
+	# {{$key}}
+	acl {{$values.endpoint | replaceAll "DOMAIN_HERE" ""}} hdr_beg(host) -i {{$values.endpoint}}
+	use_backend {{$values.endpoint | replaceAll "DOMAIN_HERE" ""}}_backend if {{$values.endpoint | replaceAll "DOMAIN_HERE" ""}}
+	{{end}}{{end}}
+	default_backend default
+{{with tree "CONSUL_DIR_HERE" | explode}}{{range $key, $values := .}}
+# {{$key}}
+backend {{$values.endpoint | replaceAll "DOMAIN_HERE" ""}}_backend
+	balance roundrobin
+	rspadd X-Rule:\ {{$values.endpoint}}
+ 	http-check expect ! rstatus ^5
+ 	default-server inter 2s fall 3 rise 2
+	{{range $name, $value := $values.instances}}
+	server {{$name}} {{$value}} check{{end}}
+	{{end}}{{end}}
+backend default
+	balance roundrobin
+	rspadd  X-Rule:\ default
+
+	server google www.google.com:80 redir http://www.google.com
